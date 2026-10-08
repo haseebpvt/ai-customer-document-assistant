@@ -1,7 +1,8 @@
 import os
 
-import boto3
 from pydantic import BaseModel, model_validator
+
+from agent.bedrock.converse import converse
 
 PROMPT = """Extract the text from this photo of a document.
 Respond with JSON only, no markdown:
@@ -24,22 +25,16 @@ class ImageExtraction(BaseModel):
 
 
 def extract_image(image_bytes: bytes, media_type: str) -> ImageExtraction:
-    response = boto3.client("bedrock-runtime").converse(
-        modelId=os.environ["BEDROCK_MODEL_ID"],
-        messages=[
+    text = converse(
+        os.environ["BEDROCK_MODEL_ID"],
+        [
+            {"text": PROMPT},
             {
-                "role": "user",
-                "content": [
-                    {"text": PROMPT},
-                    {
-                        "image": {
-                            "format": media_type,
-                            "source": {"bytes": image_bytes},
-                        }
-                    },
-                ],
-            }
+                "image": {
+                    "format": media_type,
+                    "source": {"bytes": image_bytes},
+                }
+            },
         ],
     )
-    text = response["output"]["message"]["content"][0]["text"]
     return ImageExtraction.model_validate_json(text)

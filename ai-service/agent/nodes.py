@@ -1,16 +1,19 @@
-import os
 from pathlib import Path
+from zipfile import BadZipFile
 
-import boto3
+from pypdf.errors import PdfReadError
 
-from agent.extract import extract_image
+from agent.bedrock.classify import classify_document
+from agent.bedrock.extract import extract_image
+from agent.files.documents import docx_text, pdf_text
+from agent.files.s3 import download
 from agent.state import State
 
 IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".gif", ".webp", ".bmp", ".tif", ".tiff"}
 BEDROCK_FORMATS = {".jpg": "jpeg", ".jpeg": "jpeg", ".png": "png", ".gif": "gif", ".webp": "webp"}
 
 
-def identify_file(state: State) -> dict:
+def identify_file_node(state: State) -> dict:
     extension = Path(state["s3_key"]).suffix.lower()
     if extension in IMAGE_EXTENSIONS:
         file_format = "image"
@@ -23,14 +26,7 @@ def identify_file(state: State) -> dict:
     return {"file_format": file_format}
 
 
-def download(key: str) -> bytes:
-    return boto3.client("s3").get_object(
-        Bucket=os.environ["S3_BUCKET"],
-        Key=key,
-    )["Body"].read()
-
-
-def image_processing(state: State) -> dict:
+def image_processing_node(state: State) -> dict:
     extension = Path(state["s3_key"]).suffix.lower()
     media_type = BEDROCK_FORMATS.get(extension)
     if media_type is None:
@@ -43,5 +39,20 @@ def image_processing(state: State) -> dict:
     return {"content": "", "status": "unreadable"}
 
 
-def document_processing(state: State) -> dict:
-    return {}
+def document_processing_node(state: State) -> dict:
+    body = download(state["s3_key"])
+    try:
+        if state["file_format"] == "pdf":
+            text = pdf_text(body)
+        else:
+            text = docx_text(body)
+    except (PdfReadError, BadZipFile, ValueError):
+        return {"content": "", "status": "unreadable"}
+    if text.strip():
+        return {"content": text, "status": "extracted"}
+    return {"content": "", "status": "unreadable"}
+
+
+def identify_document_node(state: State) -> dict:
+    kind = classify_document(state["content"])
+    return {"document_type": kind.document_type}
