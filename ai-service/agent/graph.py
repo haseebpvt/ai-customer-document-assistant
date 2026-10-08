@@ -14,6 +14,7 @@ builder = StateGraph(State)
 builder.add_node("identify_file", identify_file)
 builder.add_node("image_processing", image_processing)
 builder.add_node("document_processing", document_processing)
+
 builder.add_edge(START, "identify_file")
 builder.add_conditional_edges("identify_file", route_by_file_format)
 builder.add_edge("image_processing", END)

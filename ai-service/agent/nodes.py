@@ -1,8 +1,13 @@
+import os
 from pathlib import Path
 
+import boto3
+
+from agent.extract import extract_image
 from agent.state import State
 
 IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".gif", ".webp", ".bmp", ".tif", ".tiff"}
+BEDROCK_FORMATS = {".jpg": "jpeg", ".jpeg": "jpeg", ".png": "png", ".gif": "gif", ".webp": "webp"}
 
 
 def identify_file(state: State) -> dict:
@@ -19,7 +24,19 @@ def identify_file(state: State) -> dict:
 
 
 def image_processing(state: State) -> dict:
-    return {}
+    extension = Path(state["s3_key"]).suffix.lower()
+    media_type = BEDROCK_FORMATS.get(extension)
+    if media_type is None:
+        raise ValueError(f"unsupported image type: {extension}")
+
+    body = boto3.client("s3").get_object(
+        Bucket=os.environ["S3_BUCKET"],
+        Key=state["s3_key"],
+    )["Body"].read()
+    result = extract_image(body, media_type)
+    if result.readable:
+        return {"content": result.content, "status": "extracted"}
+    return {"content": "", "status": "unreadable"}
 
 
 def document_processing(state: State) -> dict:
