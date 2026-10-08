@@ -9,3 +9,4 @@ class State(TypedDict):
     content: NotRequired[str]
     status: NotRequired[Literal["extracted", "unreadable"]]
     document_type: NotRequired[DocumentType]
+    fields: NotRequired[dict[str, str | None]]

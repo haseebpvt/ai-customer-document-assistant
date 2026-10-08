@@ -5,6 +5,7 @@ from pypdf.errors import PdfReadError
 
 from agent.bedrock.classify import classify_document
 from agent.bedrock.extract import extract_image
+from agent.bedrock.fields import extract_fields
 from agent.files.documents import docx_text, pdf_text
 from agent.files.s3 import download
 from agent.state import State
@@ -56,3 +57,8 @@ def document_processing_node(state: State) -> dict:
 def identify_document_node(state: State) -> dict:
     kind = classify_document(state["content"])
     return {"document_type": kind.document_type}
+
+
+def extract_fields_node(state: State) -> dict:
+    result = extract_fields(state["content"], state["document_type"])
+    return {"fields": result.model_dump()}
