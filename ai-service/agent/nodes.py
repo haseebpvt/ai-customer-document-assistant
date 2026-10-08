@@ -23,16 +23,20 @@ def identify_file(state: State) -> dict:
     return {"file_format": file_format}
 
 
+def download(key: str) -> bytes:
+    return boto3.client("s3").get_object(
+        Bucket=os.environ["S3_BUCKET"],
+        Key=key,
+    )["Body"].read()
+
+
 def image_processing(state: State) -> dict:
     extension = Path(state["s3_key"]).suffix.lower()
     media_type = BEDROCK_FORMATS.get(extension)
     if media_type is None:
         raise ValueError(f"unsupported image type: {extension}")
 
-    body = boto3.client("s3").get_object(
-        Bucket=os.environ["S3_BUCKET"],
-        Key=state["s3_key"],
-    )["Body"].read()
+    body = download(state["s3_key"])
     result = extract_image(body, media_type)
     if result.readable:
         return {"content": result.content, "status": "extracted"}
