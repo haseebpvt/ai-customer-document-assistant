@@ -5,7 +5,8 @@ from pypdf.errors import PdfReadError
 
 from agent.bedrock.classify import classify_document
 from agent.bedrock.extract import extract_image
-from agent.bedrock.fields import extract_fields
+from agent.bedrock.fields import SCHEMAS, extract_fields
+from agent.bedrock.summary import summarize
 from agent.files.documents import docx_text, pdf_text
 from agent.files.s3 import download
 from agent.state import State
@@ -62,3 +63,27 @@ def identify_document_node(state: State) -> dict:
 def extract_fields_node(state: State) -> dict:
     result = extract_fields(state["content"], state["document_type"])
     return {"fields": result.model_dump()}
+
+
+def missing_fields_node(state: State) -> dict:
+    model = SCHEMAS[state["document_type"]]
+    values = state.get("fields") or {}
+    missing = [
+        name
+        for name in model.model_fields
+        if not (values.get(name) or "").strip()
+    ]
+    return {"missing_fields": missing}
+
+
+def summary_node(state: State) -> dict:
+    report = summarize(
+        state["document_type"],
+        state.get("fields") or {},
+        state.get("missing_fields") or [],
+    )
+    return {"report": report}
+
+
+def finalize_node(state: State) -> dict:
+    return {}
