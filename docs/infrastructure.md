@@ -17,6 +17,7 @@ Terraform describes the AWS layout. It is validated locally. It has not been app
 | `database.tf` | RDS Postgres 16, Secrets Manager `DATABASE_URL` |
 | `iam.tf` | Task and execution roles |
 | `ecs.tf` | ECR repos, cluster, task definitions, three services |
+| `autoscaling.tf` | Backend CPU scaling and worker queue scaling |
 | `outputs.tf` | Domains, queue, bucket, ECR URLs, ECS names |
 
 ## Bootstrap stack (`terraform/bootstrap/`)
@@ -40,13 +41,15 @@ RDS creates an empty Postgres database named `documents`. The `documents` table 
 
 One Fargate cluster. Three services. Separate task roles.
 
-| Service | CPU | Memory | Desired count | Port |
+| Service | CPU | Memory | Tasks | Port |
 | --- | --- | --- | --- | --- |
-| Frontend | 256 (0.25 vCPU) | 512 MB | 1 | 80 |
-| Backend | 256 (0.25 vCPU) | 512 MB | 1 | 8000 |
-| AI worker | 512 (0.5 vCPU) | 1024 MB | 1 | none |
+| Frontend | 256 (0.25 vCPU) | 512 MB | 1, fixed | 80 |
+| Backend | 256 (0.25 vCPU) | 512 MB | 1 to 3 | 8000 |
+| AI worker | 512 (0.5 vCPU) | 1024 MB | 1 to 5 | none |
 
-The AI worker holds one file in memory, so it has more memory. Desired count 1 matches one-message-at-a-time polling. A second task would be safe because of the visibility timeout; that is a count change, not a code change.
+The frontend serves static files, so it has no scaling rule. The backend target is 70% CPU. The worker target is one visible SQS message per running task. Each service has its own count: web traffic does not add worker tasks, and a long queue does not add frontend tasks.
+
+The worker holds one file in memory, so it has more memory. The 900-second visibility timeout still stops two tasks from processing the same message. A task stopped during scale-in does not lose the message. It becomes visible again and another task picks it up.
 
 ## Task role versus execution role
 

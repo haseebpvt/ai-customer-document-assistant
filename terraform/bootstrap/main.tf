@@ -224,6 +224,9 @@ data "aws_iam_policy_document" "deploy" {
       "ecr:*",
       "logs:*",
       "application-autoscaling:*",
+      "cloudwatch:PutMetricAlarm",
+      "cloudwatch:DescribeAlarms",
+      "cloudwatch:DeleteAlarms",
     ]
     resources = ["*"]
   }
@@ -273,6 +276,7 @@ data "aws_iam_policy_document" "deploy" {
       variable = "iam:AWSServiceName"
       values = [
         "ecs.amazonaws.com",
+        "ecs.application-autoscaling.amazonaws.com",
         "elasticloadbalancing.amazonaws.com",
         "rds.amazonaws.com",
       ]

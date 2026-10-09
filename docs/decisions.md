@@ -23,6 +23,7 @@
 | Outbound AWS | One NAT | VPC endpoints per service | Fewer resources for a design that is not applied. |
 | TLS | HTTP on port 80 | ACM + HTTPS listeners | Assignment requires domain names, not certificates. |
 | Images | `:latest` plus commit SHA | New task definition per commit | App deploys do not rewrite infrastructure. |
+| Scaling | Backend 1–3 on 70% CPU. Worker 1–5 on one waiting message per task. Frontend fixed at 1. | One shared count, or scaling the static frontend | Each service scales on its own load. |
 
 ## Limits an interviewer may ask about
 

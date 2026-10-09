@@ -46,9 +46,10 @@ resource "aws_cloudwatch_log_group" "ai" {
 resource "aws_ecs_cluster" "main" {
   name = "${var.name_prefix}-cluster"
 
+  # The worker scaling rule divides the queue depth by the running task count.
   setting {
     name  = "containerInsights"
-    value = "disabled"
+    value = "enabled"
   }
 
   tags = {
@@ -235,13 +236,18 @@ resource "aws_ecs_service" "backend" {
     container_port   = 8000
   }
 
+  # Autoscaling owns the count after the first task. Apply must not reset it to 1.
+  lifecycle {
+    ignore_changes = [desired_count]
+  }
+
   depends_on = [
     aws_lb_listener_rule.api_documents,
     aws_lb_listener.internal,
   ]
 }
 
-# No load balancer. Polls SQS. One task is enough for one-message-at-a-time.
+# No load balancer. Starts at one task. The queue scaling rule can raise it to five.
 resource "aws_ecs_service" "ai" {
   name            = "${var.name_prefix}-ai"
   cluster         = aws_ecs_cluster.main.id
@@ -253,5 +259,9 @@ resource "aws_ecs_service" "ai" {
     subnets          = aws_subnet.private[*].id
     security_groups  = [aws_security_group.ai.id]
     assign_public_ip = false
+  }
+
+  lifecycle {
+    ignore_changes = [desired_count]
   }
 }
