@@ -106,4 +106,9 @@ def summary_node(state: State) -> dict:
 
 
 def finalize_node(state: State) -> dict:
+    if state.get("status") == "unreadable":
+        report = "The document could not be read."
+        update_document(state["document_id"], status="completed", report=report)
+        return {"report": report}
+    update_document(state["document_id"], status="completed")
     return {}
