@@ -38,6 +38,11 @@ output "ecr_ai_url" {
   value       = aws_ecr_repository.ai.repository_url
 }
 
+output "public_alb_dns_name" {
+  description = "Load balancer address. Point app.<domain> and api.<domain> at this to test before the domain is delegated."
+  value       = aws_lb.public.dns_name
+}
+
 output "public_zone_name_servers" {
   description = "Delegate the public domain to these name servers before the app hostname resolves."
   value       = aws_route53_zone.public.name_servers

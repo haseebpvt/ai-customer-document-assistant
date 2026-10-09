@@ -27,3 +27,9 @@ variable "bedrock_classify_model_id" {
   type        = string
   default     = "amazon.nova-micro-v1:0"
 }
+
+variable "allowed_cidrs" {
+  description = "Networks that may reach the public load balancer. Narrow this to an office or VPN range for an internal tool."
+  type        = list(string)
+  default     = ["0.0.0.0/0"]
+}
