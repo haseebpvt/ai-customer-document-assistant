@@ -2,7 +2,7 @@ import os
 
 from pydantic import BaseModel, model_validator
 
-from agent.bedrock.converse import converse
+from agent.bedrock.converse import converse, json_object
 
 PROMPT = """Extract the text from this photo of a document.
 Respond with JSON only, no markdown:
@@ -37,4 +37,4 @@ def extract_image(image_bytes: bytes, media_type: str) -> ImageExtraction:
             },
         ],
     )
-    return ImageExtraction.model_validate_json(text)
+    return ImageExtraction.model_validate_json(json_object(text))

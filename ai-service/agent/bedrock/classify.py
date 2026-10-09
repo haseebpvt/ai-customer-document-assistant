@@ -3,7 +3,7 @@ from typing import Literal
 
 from pydantic import BaseModel
 
-from agent.bedrock.converse import converse
+from agent.bedrock.converse import converse, json_object
 
 PROMPT = """Classify this document as exactly one of:
 Identity Document
@@ -33,4 +33,4 @@ def classify_document(text: str) -> DocumentKind:
         os.environ["BEDROCK_CLASSIFY_MODEL_ID"],
         [{"text": PROMPT}, {"text": text}],
     )
-    return DocumentKind.model_validate_json(reply)
+    return DocumentKind.model_validate_json(json_object(reply))

@@ -4,7 +4,7 @@ import os
 from pydantic import BaseModel
 
 from agent.bedrock.classify import DocumentType
-from agent.bedrock.converse import converse
+from agent.bedrock.converse import converse, json_object
 
 PROMPT = """Write a short report of this document extraction.
 Respond with JSON only, no markdown:
@@ -50,7 +50,7 @@ def summarize(
         os.environ["BEDROCK_CLASSIFY_MODEL_ID"],
         [{"text": PROMPT}, {"text": details}],
     )
-    text = Report.model_validate_json(reply)
+    text = Report.model_validate_json(json_object(reply))
     # Copy the fields here. The model only writes the two sentences, so it cannot invent a value.
     return {
         "summary": text.summary,

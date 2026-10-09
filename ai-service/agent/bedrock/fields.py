@@ -1,38 +1,43 @@
 import json
 import os
 
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
 from agent.bedrock.classify import DocumentType
-from agent.bedrock.converse import converse
+from agent.bedrock.converse import converse, json_object
 
 
-class IdentityDocument(BaseModel):
+class Fields(BaseModel):
+    # A model may return 1250.5 instead of "1250.5". Keep every value a string.
+    model_config = ConfigDict(coerce_numbers_to_str=True)
+
+
+class IdentityDocument(Fields):
     customer_name: str | None = None
     id_number: str | None = None
     expiry_date: str | None = None
     date_of_birth: str | None = None
 
 
-class ClaimForm(BaseModel):
+class ClaimForm(Fields):
     customer_name: str | None = None
     claim_reference: str | None = None
     date: str | None = None
     amount: str | None = None
 
 
-class PolicyDocument(BaseModel):
+class PolicyDocument(Fields):
     customer_name: str | None = None
     policy_number: str | None = None
     effective_date: str | None = None
 
 
-class CustomerCorrespondence(BaseModel):
+class CustomerCorrespondence(Fields):
     customer_name: str | None = None
     date: str | None = None
 
 
-class SupportingEvidence(BaseModel):
+class SupportingEvidence(Fields):
     date: str | None = None
     description: str | None = None
 
@@ -60,4 +65,4 @@ def extract_fields(text: str, document_type: DocumentType) -> BaseModel:
         os.environ["BEDROCK_CLASSIFY_MODEL_ID"],
         [{"text": prompt}, {"text": text}],
     )
-    return model.model_validate_json(reply)
+    return model.model_validate_json(json_object(reply))
