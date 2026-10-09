@@ -2,7 +2,7 @@ import json
 import os
 from contextlib import asynccontextmanager
 from pathlib import Path
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 import boto3
 import psycopg
@@ -87,7 +87,7 @@ def list_documents():
 
 
 @app.get("/documents/{document_id}")
-def get_document(document_id: str):
+def get_document(document_id: UUID):
     with connect() as conn:
         row = conn.execute(
             "SELECT * FROM documents WHERE id = %s",
@@ -149,7 +149,7 @@ def create_document(file: UploadFile):
 
 
 @app.patch("/documents/{document_id}")
-def update_document(document_id: str, update: DocumentUpdate):
+def update_document(document_id: UUID, update: DocumentUpdate):
     # Worker progress. This route stays off the public load balancer.
     changes = update.model_dump(exclude_unset=True)
     if not changes:
