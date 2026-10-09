@@ -1,4 +1,7 @@
+from botocore.exceptions import BotoCoreError, ClientError
 from langgraph.graph import END, START, StateGraph
+from langgraph.types import RetryPolicy
+from pydantic import ValidationError
 
 from agent.nodes import (
     document_processing_node,
@@ -11,6 +14,12 @@ from agent.nodes import (
     summary_node,
 )
 from agent.state import State
+
+# Bedrock can throttle, and a model can return JSON that fails the schema. Both may pass on a second try.
+BEDROCK_RETRY = RetryPolicy(
+    max_attempts=3,
+    retry_on=(ValidationError, ClientError, BotoCoreError),
+)
 
 
 def route_by_file_format(state: State) -> str:
@@ -28,12 +37,12 @@ def route_by_content(state: State) -> str:
 
 builder = StateGraph(State)
 builder.add_node("identify_file_node", identify_file_node)
-builder.add_node("image_processing_node", image_processing_node)
+builder.add_node("image_processing_node", image_processing_node, retry_policy=BEDROCK_RETRY)
 builder.add_node("document_processing_node", document_processing_node)
-builder.add_node("identify_document_node", identify_document_node)
-builder.add_node("extract_fields_node", extract_fields_node)
+builder.add_node("identify_document_node", identify_document_node, retry_policy=BEDROCK_RETRY)
+builder.add_node("extract_fields_node", extract_fields_node, retry_policy=BEDROCK_RETRY)
 builder.add_node("missing_fields_node", missing_fields_node)
-builder.add_node("summary_node", summary_node)
+builder.add_node("summary_node", summary_node, retry_policy=BEDROCK_RETRY)
 builder.add_node("finalize_node", finalize_node)
 
 builder.add_edge(START, "identify_file_node")
