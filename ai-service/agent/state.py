@@ -12,4 +12,4 @@ class State(TypedDict):
     document_type: NotRequired[DocumentType]
     fields: NotRequired[dict[str, str | None]]
     missing_fields: NotRequired[list[str]]
-    report: NotRequired[str]
+    report: NotRequired[str | dict[str, str]]
