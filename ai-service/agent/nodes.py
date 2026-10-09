@@ -32,6 +32,7 @@ def identify_file_node(state: State) -> dict:
 
 def image_processing_node(state: State) -> dict:
     extension = Path(state["s3_key"]).suffix.lower()
+    # Bedrock takes jpeg, png, gif, and webp. Anything else fails the run.
     media_type = BEDROCK_FORMATS.get(extension)
     if media_type is None:
         raise ValueError(f"unsupported image type: {extension}")
@@ -45,6 +46,7 @@ def image_processing_node(state: State) -> dict:
 
 
 def document_processing_node(state: State) -> dict:
+    # Read the text from the file. A scan with no text layer is unreadable, not sent to the vision model.
     body = download(state["s3_key"])
     try:
         if state["file_format"] == "pdf":
@@ -106,6 +108,7 @@ def summary_node(state: State) -> dict:
 
 
 def finalize_node(state: State) -> dict:
+    # completed means the graph finished. A crash never gets here.
     if state.get("status") == "unreadable":
         report = "The document could not be read."
         update_document(state["document_id"], status="completed", report=report)

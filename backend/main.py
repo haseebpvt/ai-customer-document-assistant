@@ -43,6 +43,7 @@ def as_document(row):
 
 @asynccontextmanager
 async def lifespan(app):
+    # The table belongs to the app. Infrastructure creates the database, not this schema.
     with connect() as conn:
         conn.execute(SCHEMA)
         conn.commit()
@@ -106,6 +107,7 @@ def create_document(file: UploadFile):
         ContentType=content_type,
     )
 
+    # The row exists before the queue message, so the client can poll immediately.
     with connect() as conn:
         row = conn.execute(
             """
@@ -132,6 +134,7 @@ def create_document(file: UploadFile):
 
 @app.patch("/documents/{document_id}")
 def update_document(document_id: str, update: DocumentUpdate):
+    # Worker progress. This route stays off the public load balancer.
     changes = update.model_dump(exclude_unset=True)
     if not changes:
         return get_document(document_id)

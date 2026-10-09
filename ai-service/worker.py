@@ -22,6 +22,7 @@ def run():
         message = messages[0]
         body = json.loads(message["Body"])
         try:
+            # content_type stays on the message. The graph uses the file extension.
             graph.invoke(
                 {
                     "document_id": body["document_id"],
@@ -29,6 +30,7 @@ def run():
                 }
             )
         except Exception as error:
+            # Leave the message so SQS can retry. A later success overwrites failed.
             update_document(
                 body["document_id"],
                 status="failed",

@@ -51,6 +51,7 @@ def summarize(
         [{"text": PROMPT}, {"text": details}],
     )
     text = Report.model_validate_json(reply)
+    # Copy the fields here. The model only writes the two sentences, so it cannot invent a value.
     return {
         "summary": text.summary,
         "extracted_information": _fields(fields),

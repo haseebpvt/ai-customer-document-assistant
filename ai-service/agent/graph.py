@@ -20,6 +20,7 @@ def route_by_file_format(state: State) -> str:
 
 
 def route_by_content(state: State) -> str:
+    # No text, so skip classification. Finalize still completes the row.
     if not state.get("content", "").strip():
         return "finalize_node"
     return "identify_document_node"
