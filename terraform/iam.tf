@@ -100,10 +100,8 @@ data "aws_iam_policy_document" "ai_task" {
 
   # Model ids are env vars, so IAM is not pinned to one model.
   statement {
-    actions = [
-      "bedrock:InvokeModel",
-      "bedrock:Converse",
-    ]
+    # The Converse API is authorized by bedrock:InvokeModel.
+    actions = ["bedrock:InvokeModel"]
     resources = [
       "arn:aws:bedrock:${var.aws_region}::foundation-model/*",
       "arn:aws:bedrock:${var.aws_region}:${data.aws_caller_identity.current.account_id}:inference-profile/*",
