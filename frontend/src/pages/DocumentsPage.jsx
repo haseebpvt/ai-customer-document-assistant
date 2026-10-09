@@ -33,7 +33,7 @@ export default function DocumentsPage() {
     <>
       <h1>Documents</h1>
       <form onSubmit={onSubmit}>
-        <input name="file" type="file" accept=".pdf,.docx,image/*" required />
+        <input name="file" type="file" accept=".pdf,.docx,.jpg,.jpeg,.png,.gif,.webp" required />
         <button type="submit" disabled={uploading}>
           {uploading ? 'Uploading…' : 'Upload'}
         </button>

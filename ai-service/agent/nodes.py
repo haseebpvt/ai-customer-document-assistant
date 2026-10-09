@@ -12,20 +12,21 @@ from agent.files.s3 import download
 from agent.progress import update_document
 from agent.state import State
 
-IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".gif", ".webp", ".bmp", ".tif", ".tiff"}
 BEDROCK_FORMATS = {".jpg": "jpeg", ".jpeg": "jpeg", ".png": "png", ".gif": "gif", ".webp": "webp"}
 
 
 def identify_file_node(state: State) -> dict:
     extension = Path(state["s3_key"]).suffix.lower()
-    if extension in IMAGE_EXTENSIONS:
+    if extension in BEDROCK_FORMATS:
         file_format = "image"
     elif extension == ".pdf":
         file_format = "pdf"
     elif extension == ".docx":
         file_format = "docx"
     else:
-        raise ValueError(f"unsupported file type: {extension}")
+        # A retry cannot fix this, so it is a result, not an exception.
+        update_document(state["document_id"], status="identify_file_node")
+        return {"status": "unsupported", "error": f"unsupported file type: {extension}"}
     update_document(state["document_id"], status="identify_file_node")
     return {"file_format": file_format}
 
@@ -109,6 +110,9 @@ def summary_node(state: State) -> dict:
 
 def finalize_node(state: State) -> dict:
     # completed means the graph finished. A crash never gets here.
+    if state.get("status") == "unsupported":
+        update_document(state["document_id"], status="failed", error_message=state["error"])
+        return {}
     if state.get("status") == "unreadable":
         report = "The document could not be read."
         update_document(state["document_id"], status="completed", report=report)

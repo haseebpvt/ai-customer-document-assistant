@@ -23,6 +23,8 @@ BEDROCK_RETRY = RetryPolicy(
 
 
 def route_by_file_format(state: State) -> str:
+    if state.get("status") == "unsupported":
+        return "finalize_node"
     if state["file_format"] == "image":
         return "image_processing_node"
     return "document_processing_node"

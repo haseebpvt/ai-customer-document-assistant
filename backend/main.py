@@ -31,6 +31,9 @@ CREATE TABLE IF NOT EXISTS documents (
 
 JSON_COLUMNS = {"extracted_fields", "missing_fields", "report"}
 
+# The worker can read these. Anything else is refused at upload, not after queueing.
+ALLOWED_EXTENSIONS = {".pdf", ".docx", ".jpg", ".jpeg", ".png", ".gif", ".webp"}
+
 
 def connect():
     return psycopg.connect(os.environ["DATABASE_URL"], row_factory=dict_row)
@@ -100,6 +103,13 @@ def create_document(file: UploadFile):
     filename = Path(file.filename or "").name
     if not filename:
         raise HTTPException(status_code=400, detail="filename is required")
+
+    extension = Path(filename).suffix.lower()
+    if extension not in ALLOWED_EXTENSIONS:
+        raise HTTPException(
+            status_code=400,
+            detail=f"unsupported file type: {extension or 'none'}. Use PDF, DOCX, JPG, PNG, GIF, or WEBP.",
+        )
 
     document_id = str(uuid4())
     content_type = file.content_type or "application/octet-stream"
