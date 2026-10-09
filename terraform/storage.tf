@@ -33,10 +33,10 @@ resource "aws_sqs_queue" "dead_letter" {
   }
 }
 
-# Visibility timeout is longer than one graph run so a second worker cannot pick up the same message.
+# Longer than one graph run, including Bedrock retries. Short enough that a stopped task is retried soon.
 resource "aws_sqs_queue" "documents" {
   name                       = "${var.name_prefix}-documents"
-  visibility_timeout_seconds = 900
+  visibility_timeout_seconds = 300
   receive_wait_time_seconds  = 20
 
   redrive_policy = jsonencode({

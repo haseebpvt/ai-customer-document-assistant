@@ -12,5 +12,5 @@ def update_document(document_id: str, **fields) -> None:
         method="PATCH",
         headers={"Content-Type": "application/json"},
     )
-    with urlopen(request):
+    with urlopen(request, timeout=10):
         return

@@ -92,6 +92,7 @@ data "aws_iam_policy_document" "ai_task" {
     actions = [
       "sqs:ReceiveMessage",
       "sqs:DeleteMessage",
+      "sqs:ChangeMessageVisibility",
       "sqs:GetQueueAttributes",
     ]
     resources = [aws_sqs_queue.documents.arn]

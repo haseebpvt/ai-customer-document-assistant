@@ -115,7 +115,8 @@ def finalize_node(state: State) -> dict:
         return {}
     if state.get("status") == "unreadable":
         report = "The document could not be read."
-        update_document(state["document_id"], status="completed", report=report)
+        update_document(state["document_id"], status="completed", report=report, error_message=None)
         return {"report": report}
-    update_document(state["document_id"], status="completed")
+    # Clear the message a failed earlier attempt left on the row.
+    update_document(state["document_id"], status="completed", error_message=None)
     return {}
