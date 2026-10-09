@@ -86,7 +86,8 @@ data "aws_iam_policy_document" "plan_assume" {
 }
 
 resource "aws_iam_role" "plan" {
-  name               = "${var.name_prefix}-gha-plan"
+  # Outside the cda-* pattern so the deploy role cannot edit this trust policy.
+  name               = "gha-${var.name_prefix}-plan"
   assume_role_policy = data.aws_iam_policy_document.plan_assume.json
 }
 
@@ -160,7 +161,8 @@ data "aws_iam_policy_document" "deploy_assume" {
 }
 
 resource "aws_iam_role" "deploy" {
-  name               = "${var.name_prefix}-gha-deploy"
+  # Outside the cda-* pattern so this role cannot rewrite its own trust policy.
+  name               = "gha-${var.name_prefix}-deploy"
   assume_role_policy = data.aws_iam_policy_document.deploy_assume.json
 }
 

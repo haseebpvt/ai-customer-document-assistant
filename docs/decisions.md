@@ -1,0 +1,45 @@
+# Assumptions, tradeoffs, and future improvements
+
+## Assumptions
+
+- One private S3 bucket for uploads
+- Two Bedrock model ids: vision for images, smaller text model for classify, extract, and summary
+- No user login. Anyone who can reach the public app can upload and view documents
+- Progress is one Postgres row per upload
+- Bedrock model id variables default to empty; the worker fails until they are set for a real deploy
+- Public domain defaults to `cda.example.com` and does not resolve until name servers are delegated
+- This submission does not apply Terraform, push images, or run the deploy workflow
+
+## Tradeoffs
+
+| Decision | Chose | Instead of | Why |
+| --- | --- | --- | --- |
+| PDF and DOCX text | Local `pypdf` / `python-docx` | Sending every document to the vision model | Cheaper and faster for files with a text layer. Scanned PDFs with no text are unreadable. |
+| Progress updates | Poll every 5 seconds | WebSockets or SSE | Simple for the brief. No sticky sessions or extra protocol. |
+| Table schema | Backend creates the table on startup | Terraform or a migration tool | Schema stays with the app. Terraform stays infrastructure. |
+| Worker data access | PATCH through private backend | Direct Postgres from the worker | One writer, one security group rule to RDS. |
+| Public routing | Two hostnames (`app.` and `api.`) | Path rules on one host | React and API both use `/documents/...`. |
+| Private discovery | Internal ALB + Route 53 | ECS Service Connect / Cloud Map | Stable name, health checks, one backend behind both doors. |
+| Outbound AWS | One NAT | VPC endpoints per service | Fewer resources for a design that is not applied. |
+| TLS | HTTP on port 80 | ACM + HTTPS listeners | Assignment requires domain names, not certificates. |
+| Images | `:latest` plus commit SHA | New task definition per commit | App deploys do not rewrite infrastructure. |
+
+## Limits an interviewer may ask about
+
+**Backend health check is `GET /documents`.** It returns 200 and touches the database, so it proves the process and Postgres are up. It also returns every row. A dedicated `/health` route would be lighter.
+
+**Unreadable report is a string; a normal report is an object.** The UI and the JSON column accept both. A single report shape for every path would be cleaner.
+
+**If the backend is down when the worker records `failed`.** The PATCH raises, the worker process exits, ECS restarts it, and the SQS message reappears after the visibility timeout. The row may stay at the last successful node status until a later attempt.
+
+**GitHub roles sit outside `cda-*`.** Named `gha-cda-plan` and `gha-cda-deploy` so the deploy role's IAM name filter cannot rewrite those trust policies.
+
+## Future improvements
+
+- Send scanned PDFs with no text layer through the vision path instead of marking them unreadable
+- CloudWatch alarm on the dead-letter queue depth
+- HTTPS listeners and a real delegated domain
+- Second NAT for multi-AZ outbound resilience
+- Dedicated `/health` route that does not list documents
+- Stronger next-action suggestions if the report prompt stays thin
+- Optional auth if the tool leaves an internal network boundary
