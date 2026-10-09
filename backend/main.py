@@ -51,9 +51,15 @@ async def lifespan(app):
 
 
 app = FastAPI(lifespan=lifespan)
+
+# Local Vite plus the deployed app hostname from CORS_ORIGIN.
+_cors_origins = ["http://127.0.0.1:5173", "http://localhost:5173"]
+if os.environ.get("CORS_ORIGIN"):
+    _cors_origins.append(os.environ["CORS_ORIGIN"])
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://127.0.0.1:5173", "http://localhost:5173"],
+    allow_origins=_cors_origins,
     allow_methods=["*"],
     allow_headers=["*"],
 )
