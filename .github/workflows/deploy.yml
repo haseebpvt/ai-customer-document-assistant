@@ -48,6 +48,12 @@ jobs:
       - name: Backend and AI syntax
         run: python -m compileall backend ai-service
 
+      - name: AI service unit tests
+        working-directory: ai-service
+        run: |
+          pip install -r requirements.txt pytest
+          python -m pytest -q
+
       - uses: hashicorp/setup-terraform@v3
         with:
           terraform_version: ${{ env.TF_VERSION }}
@@ -177,3 +183,9 @@ jobs:
               --service "$service" \
               --force-new-deployment
           done
+          aws ecs wait services-stable \
+            --cluster "${{ needs.apply.outputs.ecs_cluster_name }}" \
+            --services \
+              "${{ needs.apply.outputs.ecs_frontend_service_name }}" \
+              "${{ needs.apply.outputs.ecs_backend_service_name }}" \
+              "${{ needs.apply.outputs.ecs_ai_service_name }}"
