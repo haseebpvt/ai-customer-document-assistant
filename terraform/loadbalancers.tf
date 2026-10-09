@@ -165,7 +165,8 @@ resource "aws_lb_listener_rule" "api_documents" {
 
   condition {
     path_pattern {
-      values = ["/documents", "/documents/*"]
+      # One pattern, not two. A rule may hold five condition values: 1 host + 1 path + 3 methods.
+      values = ["/documents*"]
     }
   }
 
