@@ -1,6 +1,7 @@
 from io import BytesIO
 
 from docx import Document
+from docx.table import Table
 from pypdf import PdfReader
 
 
@@ -10,5 +11,13 @@ def pdf_text(body: bytes) -> str:
 
 
 def docx_text(body: bytes) -> str:
+    # Forms are often laid out as tables. Paragraphs alone would miss them.
     document = Document(BytesIO(body))
-    return "\n".join(paragraph.text for paragraph in document.paragraphs)
+    lines = []
+    for block in document.iter_inner_content():
+        if isinstance(block, Table):
+            for row in block.rows:
+                lines.append(" | ".join(cell.text for cell in row.cells))
+        else:
+            lines.append(block.text)
+    return "\n".join(lines)
