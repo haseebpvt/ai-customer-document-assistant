@@ -17,13 +17,13 @@ variable "name_prefix" {
 }
 
 variable "bedrock_model_id" {
-  description = "Vision model id for image text extraction. Empty until apply time."
+  description = "Vision model id for image text extraction."
   type        = string
-  default     = ""
+  default     = "amazon.nova-lite-v1:0"
 }
 
 variable "bedrock_classify_model_id" {
   description = "Smaller text model id for classify, extract, and summary."
   type        = string
-  default     = ""
+  default     = "amazon.nova-micro-v1:0"
 }

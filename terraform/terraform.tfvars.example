@@ -2,6 +2,6 @@ aws_region  = "us-east-1"
 public_domain = "cda.example.com"
 name_prefix = "cda"
 
-# Set real Bedrock model ids before apply.
+# Defaults. Override these to use different Bedrock models.
 bedrock_model_id          = "amazon.nova-lite-v1:0"
 bedrock_classify_model_id = "amazon.nova-micro-v1:0"
