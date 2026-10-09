@@ -4,6 +4,7 @@ import os
 import boto3
 
 from agent.graph import graph
+from agent.progress import update_document
 
 
 def run():
@@ -20,12 +21,20 @@ def run():
             continue
         message = messages[0]
         body = json.loads(message["Body"])
-        graph.invoke(
-            {
-                "document_id": body["document_id"],
-                "s3_key": body["s3_key"],
-            }
-        )
+        try:
+            graph.invoke(
+                {
+                    "document_id": body["document_id"],
+                    "s3_key": body["s3_key"],
+                }
+            )
+        except Exception as error:
+            update_document(
+                body["document_id"],
+                status="failed",
+                error_message=str(error),
+            )
+            continue
         sqs.delete_message(
             QueueUrl=queue_url,
             ReceiptHandle=message["ReceiptHandle"],
