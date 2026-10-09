@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { getDocument } from '../api.js'
+import { statusLabel } from '../status.js'
 
 const FINISHED = new Set(['completed', 'failed'])
 
@@ -50,11 +51,12 @@ export default function DocumentPage() {
       {document && (
         <>
           <h1>{document.filename}</h1>
-          <p>Status: {document.status}</p>
+          <p>Status: {statusLabel(document.status)}</p>
           {document.document_type && <p>Type: {document.document_type}</p>}
-          {document.status === 'failed' && document.error_message && (
-            <p className="error">{document.error_message}</p>
-          )}
+          {(document.status === 'failed' || document.status === 'retrying') &&
+            document.error_message && (
+              <p className="error">{document.error_message}</p>
+            )}
           {fields.length > 0 && (
             <section>
               <h2>Extracted fields</h2>

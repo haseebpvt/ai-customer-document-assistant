@@ -3,7 +3,10 @@ const API = import.meta.env.VITE_API_URL ?? 'http://localhost:8000'
 async function request(path, options) {
   const response = await fetch(`${API}${path}`, options)
   if (!response.ok) {
-    throw new Error(`Request failed (${response.status})`)
+    // FastAPI puts the reason in detail.
+    const body = await response.json().catch(() => null)
+    const detail = typeof body?.detail === 'string' ? body.detail : null
+    throw new Error(detail ?? `Request failed (${response.status})`)
   }
   return response.json()
 }

@@ -1,6 +1,9 @@
 import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { listDocuments, uploadDocument } from '../api.js'
+import { statusLabel } from '../status.js'
+
+const FINISHED = new Set(['completed', 'failed'])
 
 export default function DocumentsPage() {
   const navigate = useNavigate()
@@ -9,9 +12,28 @@ export default function DocumentsPage() {
   const [uploading, setUploading] = useState(false)
 
   useEffect(() => {
-    listDocuments()
-      .then((rows) => setDocuments(sortNewest(rows)))
-      .catch((err) => setError(err.message))
+    let timer
+    let cancelled = false
+
+    async function load() {
+      try {
+        const rows = sortNewest(await listDocuments())
+        if (cancelled) return
+        setDocuments(rows)
+        setError('')
+        if (rows.some((row) => !FINISHED.has(row.status))) {
+          timer = setTimeout(load, 5000)
+        }
+      } catch (err) {
+        if (!cancelled) setError(err.message)
+      }
+    }
+
+    load()
+    return () => {
+      cancelled = true
+      clearTimeout(timer)
+    }
   }, [])
 
   async function onSubmit(event) {
@@ -46,7 +68,7 @@ export default function DocumentsPage() {
           {documents.map((document) => (
             <li key={document.id}>
               <Link to={`/documents/${document.id}`}>{document.filename}</Link>
-              <span>{document.status}</span>
+              <span>{statusLabel(document.status)}</span>
               <time>{formatTime(document.created_at)}</time>
               {document.status === 'failed' && document.error_message && (
                 <span className="error">{document.error_message}</span>
