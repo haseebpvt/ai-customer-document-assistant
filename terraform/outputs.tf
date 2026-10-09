@@ -42,3 +42,23 @@ output "public_zone_name_servers" {
   description = "Delegate the public domain to these name servers before the app hostname resolves."
   value       = aws_route53_zone.public.name_servers
 }
+
+output "ecs_cluster_name" {
+  description = "ECS cluster name used by the deploy workflow force-new-deployment step."
+  value       = aws_ecs_cluster.main.name
+}
+
+output "ecs_frontend_service_name" {
+  description = "Frontend ECS service name."
+  value       = aws_ecs_service.frontend.name
+}
+
+output "ecs_backend_service_name" {
+  description = "Backend ECS service name."
+  value       = aws_ecs_service.backend.name
+}
+
+output "ecs_ai_service_name" {
+  description = "AI worker ECS service name."
+  value       = aws_ecs_service.ai.name
+}

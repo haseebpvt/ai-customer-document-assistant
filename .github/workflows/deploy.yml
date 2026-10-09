@@ -1,0 +1,177 @@
+# Main only: apply, build images, force ECS rollout.
+# Requires GitHub secret AWS_DEPLOY_ROLE_ARN and variables TF_STATE_BUCKET, TF_LOCK_TABLE
+# after terraform/bootstrap has been applied once by a person.
+# This workflow is not executed for the take-home submission.
+
+name: deploy
+
+on:
+  push:
+    branches:
+      - main
+
+concurrency:
+  group: deploy
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  id-token: write
+
+env:
+  AWS_REGION: us-east-1
+  TF_VERSION: 1.9.8
+
+jobs:
+  checks:
+    name: syntax checks
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Frontend lint
+        working-directory: frontend
+        run: |
+          npm ci
+          npm run lint
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Backend and AI syntax
+        run: python -m compileall backend ai-service
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+
+      - name: Terraform fmt and validate
+        working-directory: terraform
+        run: |
+          terraform fmt -check -recursive
+          terraform init -backend=false
+          terraform validate
+
+  apply:
+    name: terraform apply
+    runs-on: ubuntu-latest
+    needs: checks
+    outputs:
+      api_domain: ${{ steps.outputs.outputs.api_domain }}
+      ecr_frontend_url: ${{ steps.outputs.outputs.ecr_frontend_url }}
+      ecr_backend_url: ${{ steps.outputs.outputs.ecr_backend_url }}
+      ecr_ai_url: ${{ steps.outputs.outputs.ecr_ai_url }}
+      ecs_cluster_name: ${{ steps.outputs.outputs.ecs_cluster_name }}
+      ecs_frontend_service_name: ${{ steps.outputs.outputs.ecs_frontend_service_name }}
+      ecs_backend_service_name: ${{ steps.outputs.outputs.ecs_backend_service_name }}
+      ecs_ai_service_name: ${{ steps.outputs.outputs.ecs_ai_service_name }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+
+      - name: Terraform apply
+        working-directory: terraform
+        run: |
+          terraform init \
+            -backend-config="bucket=${{ vars.TF_STATE_BUCKET }}" \
+            -backend-config="dynamodb_table=${{ vars.TF_LOCK_TABLE }}" \
+            -backend-config="region=${{ env.AWS_REGION }}" \
+            -backend-config="encrypt=true"
+          terraform apply -input=false -auto-approve
+
+      - name: Export Terraform outputs
+        id: outputs
+        working-directory: terraform
+        run: |
+          echo "api_domain=$(terraform output -raw api_domain)" >> "$GITHUB_OUTPUT"
+          echo "ecr_frontend_url=$(terraform output -raw ecr_frontend_url)" >> "$GITHUB_OUTPUT"
+          echo "ecr_backend_url=$(terraform output -raw ecr_backend_url)" >> "$GITHUB_OUTPUT"
+          echo "ecr_ai_url=$(terraform output -raw ecr_ai_url)" >> "$GITHUB_OUTPUT"
+          echo "ecs_cluster_name=$(terraform output -raw ecs_cluster_name)" >> "$GITHUB_OUTPUT"
+          echo "ecs_frontend_service_name=$(terraform output -raw ecs_frontend_service_name)" >> "$GITHUB_OUTPUT"
+          echo "ecs_backend_service_name=$(terraform output -raw ecs_backend_service_name)" >> "$GITHUB_OUTPUT"
+          echo "ecs_ai_service_name=$(terraform output -raw ecs_ai_service_name)" >> "$GITHUB_OUTPUT"
+
+  images:
+    name: build and push images
+    runs-on: ubuntu-latest
+    needs: apply
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - uses: aws-actions/amazon-ecr-login@v2
+        id: ecr
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Build and push frontend
+        uses: docker/build-push-action@v6
+        with:
+          context: frontend
+          push: true
+          build-args: |
+            VITE_API_URL=${{ needs.apply.outputs.api_domain }}
+          tags: |
+            ${{ needs.apply.outputs.ecr_frontend_url }}:latest
+            ${{ needs.apply.outputs.ecr_frontend_url }}:${{ github.sha }}
+
+      - name: Build and push backend
+        uses: docker/build-push-action@v6
+        with:
+          context: backend
+          push: true
+          tags: |
+            ${{ needs.apply.outputs.ecr_backend_url }}:latest
+            ${{ needs.apply.outputs.ecr_backend_url }}:${{ github.sha }}
+
+      - name: Build and push AI service
+        uses: docker/build-push-action@v6
+        with:
+          context: ai-service
+          push: true
+          tags: |
+            ${{ needs.apply.outputs.ecr_ai_url }}:latest
+            ${{ needs.apply.outputs.ecr_ai_url }}:${{ github.sha }}
+
+  rollout:
+    name: force ECS deployment
+    runs-on: ubuntu-latest
+    needs: [apply, images]
+    steps:
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Roll out new images
+        run: |
+          for service in \
+            "${{ needs.apply.outputs.ecs_frontend_service_name }}" \
+            "${{ needs.apply.outputs.ecs_backend_service_name }}" \
+            "${{ needs.apply.outputs.ecs_ai_service_name }}"
+          do
+            aws ecs update-service \
+              --cluster "${{ needs.apply.outputs.ecs_cluster_name }}" \
+              --service "$service" \
+              --force-new-deployment
+          done
