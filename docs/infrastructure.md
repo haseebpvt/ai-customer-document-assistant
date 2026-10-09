@@ -7,7 +7,7 @@ Terraform describes the AWS layout. It is validated locally. It has not been app
 | File | Creates |
 | --- | --- |
 | `versions.tf` | Terraform and AWS provider |
-| `variables.tf` | Region, public domain, name prefix, Bedrock model ids |
+| `variables.tf` | Region, public domain, name prefix, Bedrock model ids, `allowed_cidrs` |
 | `backend.tf` | Partial S3 backend. Bucket and lock table passed at init |
 | `network.tf` | VPC, public and private subnets, one NAT, routes |
 | `security.tf` | Security groups for ALBs, three services, RDS |
@@ -18,7 +18,7 @@ Terraform describes the AWS layout. It is validated locally. It has not been app
 | `iam.tf` | Task and execution roles |
 | `ecs.tf` | ECR repos, cluster, task definitions, three services |
 | `autoscaling.tf` | Backend CPU scaling and worker queue scaling |
-| `outputs.tf` | Domains, queue, bucket, ECR URLs, ECS names |
+| `outputs.tf` | Domains, `public_alb_dns_name`, queue, bucket, ECR URLs, ECS names |
 
 ## Bootstrap stack (`terraform/bootstrap/`)
 
@@ -49,7 +49,7 @@ One Fargate cluster. Three services. Separate task roles.
 
 The frontend serves static files, so it has no scaling rule. The backend target is 70% CPU. The worker target is one visible SQS message per running task. Each service has its own count: web traffic does not add worker tasks, and a long queue does not add frontend tasks.
 
-The worker holds one file in memory, so it has more memory. The 900-second visibility timeout still stops two tasks from processing the same message. A task stopped during scale-in does not lose the message. It becomes visible again and another task picks it up.
+The worker holds one file in memory, so it has more memory. The 300-second visibility timeout is still longer than one graph run, including Bedrock retries, and it shortens the wait when a task is stopped mid-document during scale-in or a deploy. A stopped task does not lose the message. It becomes visible again and another task picks it up.
 
 ## Task role versus execution role
 
@@ -58,7 +58,9 @@ The worker holds one file in memory, so it has more memory. The 900-second visib
 | Task role | The process (`boto3`) | S3, SQS, Bedrock permissions |
 | Execution role | The ECS agent | Pull from ECR, write logs, inject secrets |
 
-Frontend task role has no AWS permissions. Backend task role can PutObject and SendMessage. AI task role can GetObject, receive and delete messages, and call Bedrock. Only the backend execution role can read the `DATABASE_URL` secret. The AI service never receives that secret.
+Frontend task role has no AWS permissions. Backend task role can PutObject and SendMessage. AI task role can GetObject, receive and delete messages, change message visibility, and call Bedrock through `bedrock:InvokeModel`. Only the backend execution role can read the `DATABASE_URL` secret. The AI service never receives that secret.
+
+Bedrock model ids default to `amazon.nova-lite-v1:0` and `amazon.nova-micro-v1:0`. Override them with the same variable names. `allowed_cidrs` defaults to `0.0.0.0/0` and should be narrowed for a real internal deployment.
 
 ## Environment variables
 
@@ -77,7 +79,7 @@ Services would fail to start until those images exist. That is expected before t
 ## Storage and queue
 
 - S3: private, public access blocked, SSE-S3.
-- SQS: visibility timeout 900 seconds (longer than one graph run). Dead-letter queue after 3 receives. Long poll 20 seconds, matching the worker.
+- SQS: visibility timeout 300 seconds, still longer than one graph run with retries. Dead-letter queue after 3 receives. Long poll 20 seconds, matching the worker. On a failed attempt the worker sets the next visibility to 30 seconds.
 
 ## Database
 

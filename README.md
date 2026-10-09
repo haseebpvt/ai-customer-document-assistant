@@ -31,7 +31,7 @@ This repository contains the frontend, backend API, AI worker, Terraform, CI/CD 
 
 ## Run locally
 
-Local runs need Postgres plus a real S3 bucket, SQS queue, and Bedrock access through your own AWS credentials. There is no local AWS emulator.
+Local runs need Postgres plus an S3 bucket, an SQS queue, and Bedrock access. boto3 reads `AWS_ENDPOINT_URL`, so S3 and SQS can point at a local emulator (for example one listening on `http://localhost:4566`, with dummy credentials). Bedrock still needs real access unless the emulator provides it.
 
 ### Backend
 
@@ -67,6 +67,10 @@ python worker.py
 
 The worker has no `DATABASE_URL`. Progress goes through `PATCH` on the backend.
 
+```bash
+cd ai-service && python -m pytest -q
+```
+
 ### Frontend
 
 ```bash
@@ -83,7 +87,7 @@ Open the Vite URL (usually `http://localhost:5173`). In Docker, `VITE_API_URL` i
 
 1. Apply `terraform/bootstrap` once from a machine with AWS credentials. It uses local state.
 2. Set GitHub secrets `AWS_PLAN_ROLE_ARN` and `AWS_DEPLOY_ROLE_ARN`, and variables `TF_STATE_BUCKET` and `TF_LOCK_TABLE`, from the bootstrap outputs.
-3. Set Bedrock model ids in Terraform variables or the AI task definition before a real apply.
-4. Push to `main`. The deploy workflow applies the main stack, builds and pushes the three images, and force-rolls the ECS services.
+3. Bedrock model ids default to Nova Lite and Nova Micro. Override `bedrock_model_id` and `bedrock_classify_model_id` to use different models.
+4. Push to `main`. Once the bootstrap variables are set, the deploy workflow applies the main stack, builds and pushes the three images, and force-rolls the ECS services.
 
 Details: [docs/cicd.md](docs/cicd.md) and [docs/infrastructure.md](docs/infrastructure.md).

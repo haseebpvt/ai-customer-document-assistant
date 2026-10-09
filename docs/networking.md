@@ -45,9 +45,11 @@ One public application load balancer. Two Route 53 records in the public zone:
 | Host | Rule | Target |
 | --- | --- | --- |
 | `app.<domain>` | every path | Frontend target group |
-| `api.<domain>` | GET, POST, OPTIONS on `/documents` and `/documents/*` | Backend public target group |
+| `api.<domain>` | GET, POST, OPTIONS on `/documents*` | Backend public target group |
 | `api.<domain>` | PATCH | Fixed 403 |
 | anything else | default | Fixed 404 |
+
+The path is one pattern because an ALB rule allows five condition values: one host, one path, and three methods. `/documents*` also matches paths such as `/documentsx`. FastAPI answers those with 404.
 
 Two hostnames, not path rules on one host. The React detail page is `/documents/:id`. The API is also `/documents/{id}`. A path rule on one hostname would send a browser refresh of the detail page to FastAPI and return JSON.
 
@@ -65,7 +67,7 @@ Same uvicorn process, two target groups. A target group belongs to one load bala
 
 | Group | Inbound | Outbound |
 | --- | --- | --- |
-| Public ALB | 80 from the internet | to tasks |
+| Public ALB | 80 from `allowed_cidrs` | to tasks |
 | Frontend tasks | 80 from public ALB | 443 for ECR and logs |
 | Backend tasks | 8000 from public ALB and from internal ALB | 443 for AWS APIs; 5432 to RDS |
 | Internal ALB | 80 from the AI worker only | to backend |
@@ -89,3 +91,7 @@ The worker discovers the backend through a private DNS name on an internal load 
 | One NAT | Private tasks need outbound AWS access without public IPs. Simpler than one VPC endpoint per service. | If that availability zone fails, private tasks in the other zone lose outbound AWS access. A second NAT is the fix. |
 | HTTP only | Domain names satisfy the brief. TLS needs a certificate for a domain we control and an apply. | Traffic is not encrypted in transit to the ALB. |
 | NAT instead of VPC endpoints | Fewer moving parts for a design that is not applied. | Data path for S3/SQS/ECR leaves the VPC. |
+
+## Opening the app before the domain is delegated
+
+The listener rules match the hostnames only, so the load balancer's own DNS name returns 404. To test, map `app.<domain>` and `api.<domain>` to the `public_alb_dns_name` output's address in a hosts file, or send the host header directly, for example `curl -H "Host: api.cda.example.com" http://<public_alb_dns_name>/documents`.

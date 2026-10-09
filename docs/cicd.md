@@ -7,6 +7,7 @@ Two GitHub Actions workflows. Auth is GitHub OIDC. No long-lived AWS keys in the
 ```mermaid
 flowchart TD
   pr[PullRequest] --> checksPR[SyntaxChecks]
+  checksPR --> imagesPR[BuildImagesNoPush]
   checksPR --> plan[TerraformPlan]
   main[PushToMain] --> checksMain[SyntaxChecks]
   checksMain --> apply[TerraformApply]
@@ -16,8 +17,8 @@ flowchart TD
 
 | File | Trigger | Jobs |
 | --- | --- | --- |
-| `.github/workflows/ci.yml` | `pull_request` | syntax checks, then `terraform plan` |
-| `.github/workflows/deploy.yml` | `push` to `main` | syntax checks, apply, build and push images, force ECS rollout |
+| `.github/workflows/ci.yml` | `pull_request` | syntax checks, unit tests, image builds with no push, then `terraform plan` |
+| `.github/workflows/deploy.yml` | `push` to `main` | syntax checks, unit tests, apply, build and push images, force ECS rollout and wait |
 
 Both set `permissions: contents: read` and `id-token: write` for OIDC.
 
@@ -29,9 +30,10 @@ Tools the apps already have. No new linter was added for CI.
 | --- | --- |
 | Frontend | `npm ci` and `npm run lint` |
 | Backend and AI | `python -m compileall backend ai-service` |
+| AI service | `python -m pytest -q` |
 | Terraform | `terraform fmt -check`, then `init -backend=false` and `validate` |
 
-Image builds stay on `main`. `VITE_API_URL` is a build arg and a pull request does not need an image.
+Pull requests also build the three images and do not push them. `VITE_API_URL` for that build is `http://api.example.test`. `main` still builds and pushes the real images.
 
 ## AWS auth and trust
 
@@ -57,11 +59,13 @@ Filled after bootstrap apply. None are committed.
 
 The main stack backend is configured at init with `-backend-config` for bucket, DynamoDB table, region, and `encrypt=true`. Local validate keeps using `-backend=false`.
 
+`terraform plan` on pull requests and `terraform apply` on `main` are skipped until `TF_STATE_BUCKET` is set. That variable, the lock table, and the role ARNs come from the bootstrap outputs. Image push and rollout need apply, so they are skipped with it. The syntax checks still run.
+
 ## Deploy order on main
 
 1. **`terraform apply`** — creates or updates infrastructure, including ECR repositories.
 2. **Build and push** the three images, tagged `:latest` and the commit SHA. Frontend build passes `VITE_API_URL` from the `api_domain` output.
-3. **`aws ecs update-service --force-new-deployment`** for all three services so tasks pull the new `:latest`.
+3. **`aws ecs update-service --force-new-deployment`** for all three services so tasks pull the new `:latest`, then **`aws ecs wait services-stable`** so the run fails if the new tasks do not become healthy.
 
 Apply runs first because ECR belongs to Terraform. The first real apply creates services before any image exists, so those tasks fail until step 3. That is one deploy, not a second pipeline.
 
@@ -69,7 +73,7 @@ Apply runs first because ECR belongs to Terraform. The first real apply creates 
 
 ## What this pipeline deliberately does not do
 
-- No `terraform apply` or image build on pull requests
-- No unit test suite (the repository has none; CI uses lint and syntax only)
+- No `terraform apply` on pull requests. Pull requests do build the three images, without pushing them
+- Unit tests cover graph routing, missing fields, and JSON parsing. There are no backend or frontend tests
 - No apply or deploy executed for this take-home submission
 - No AWS account id or role ARN committed to the repo

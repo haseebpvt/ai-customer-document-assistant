@@ -64,6 +64,7 @@ The UI polls one row per upload. Status moves through:
 | `queued` | Row inserted. SQS message sent. Worker has not started. |
 | node name | Graph is at that node, for example `identify_document_node`. |
 | `completed` | Graph finished. Unreadable files also end here, with a short report. |
-| `failed` | Worker caught an exception. Message stays for SQS retry. |
+| `retrying` | An attempt failed. SQS redelivers the message in 30 seconds. |
+| `failed` | Final. An unsupported file, or the third failed receive. |
 
 `completed` means the graph finished, not that every field was found. Missing fields live in `missing_fields` and in the report.

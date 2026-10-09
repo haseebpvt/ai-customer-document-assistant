@@ -3,10 +3,11 @@
 ## Assumptions
 
 - One private S3 bucket for uploads
-- Two Bedrock model ids: vision for images, smaller text model for classify, extract, and summary
-- No user login. Anyone who can reach the public app can upload and view documents
+- Two Bedrock model ids: vision for images (`amazon.nova-lite-v1:0`), smaller text model for classify, extract, and summary (`amazon.nova-micro-v1:0`). Both can be overridden
+- There is no login because this is an internal tool. Network access is limited with `allowed_cidrs`, which defaults to open and should be narrowed in a real deployment
 - Progress is one Postgres row per upload
-- Bedrock model id variables default to empty; the worker fails until they are set for a real deploy
+- Each document is processed on its own, one file per upload request. The brief does not mention batches or comparing documents with each other
+- The brief names ECS, Terraform, Docker and LangGraph. SQS, Postgres on RDS, FastAPI, React and Bedrock are design choices made for this solution
 - Public domain defaults to `cda.example.com` and does not resolve until name servers are delegated
 - This submission does not apply Terraform, push images, or run the deploy workflow
 
@@ -24,6 +25,9 @@
 | TLS | HTTP on port 80 | ACM + HTTPS listeners | Assignment requires domain names, not certificates. |
 | Images | `:latest` plus commit SHA | New task definition per commit | App deploys do not rewrite infrastructure. |
 | Scaling | Backend 1–3 on 70% CPU. Worker 1–5 on one waiting message per task. Frontend fixed at 1. | One shared count, or scaling the static frontend | Each service scales on its own load. |
+| Worker concurrency | One message per task | Several documents at once inside one task | Scaling follows queue depth directly and a crash affects one document. Less efficient, since most time is spent waiting on Bedrock. |
+| Unsupported files | Refused at upload, and a route inside the graph | Raising an exception | A retry cannot fix a file type, so it should not be retried. |
+| Failures | Node retry (3 attempts), then SQS redelivery (3 receives), then dead-letter queue | A single retry layer | Short problems are absorbed inside the graph. Longer ones wait in the queue. |
 
 ## Limits an interviewer may ask about
 
@@ -43,4 +47,10 @@
 - Second NAT for multi-AZ outbound resilience
 - Dedicated `/health` route that does not list documents
 - Stronger next-action suggestions if the report prompt stays thin
-- Optional auth if the tool leaves an internal network boundary
+- Process several documents concurrently inside one worker task, since most of the time is spent waiting on Bedrock
+- A status history table with a timestamp per change, for a timeline on each document
+- Cross-document checks: group one customer's documents into a case and compare names, dates and references
+- Push updates over WebSockets or server-sent events instead of polling, with Redis pub/sub only if push is adopted
+- Single sign-on at the load balancer (Cognito or a corporate identity provider) and per-user history
+- Scale the worker to zero when the queue is empty: cheaper, with a startup delay on the first document
+- At least two tasks per service across two availability zones, and Multi-AZ for RDS
