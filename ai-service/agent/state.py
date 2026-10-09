@@ -4,6 +4,7 @@ from agent.bedrock.classify import DocumentType
 
 
 class State(TypedDict):
+    document_id: str
     s3_key: str
     file_format: NotRequired[Literal["image", "pdf", "docx"]]
     content: NotRequired[str]

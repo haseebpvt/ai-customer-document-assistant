@@ -1,0 +1,36 @@
+import json
+import os
+
+import boto3
+
+from agent.graph import graph
+
+
+def run():
+    sqs = boto3.client("sqs")
+    queue_url = os.environ["SQS_QUEUE_URL"]
+    while True:
+        response = sqs.receive_message(
+            QueueUrl=queue_url,
+            MaxNumberOfMessages=1,
+            WaitTimeSeconds=20,
+        )
+        messages = response.get("Messages", [])
+        if not messages:
+            continue
+        message = messages[0]
+        body = json.loads(message["Body"])
+        graph.invoke(
+            {
+                "document_id": body["document_id"],
+                "s3_key": body["s3_key"],
+            }
+        )
+        sqs.delete_message(
+            QueueUrl=queue_url,
+            ReceiptHandle=message["ReceiptHandle"],
+        )
+
+
+if __name__ == "__main__":
+    run()
